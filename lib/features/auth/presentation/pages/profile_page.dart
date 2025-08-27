@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import '../bloc/auth_bloc.dart';
-import '../bloc/auth_event.dart';
-import '../bloc/auth_state.dart';
 import '../../domain/entities/user.dart';
+import '../../../../core/routes/app_routes.dart';
 
 /// Page de profil utilisateur
 class ProfilePage extends StatelessWidget {
@@ -11,17 +8,19 @@ class ProfilePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Utilisateur de démonstration pour la présentation
+    final demoUser = User(
+      id: 'demo-user-1',
+      firstName: 'John',
+      lastName: 'Doe',
+      email: 'john.doe@example.com',
+      createdAt: DateTime.now().subtract(const Duration(days: 30)),
+      updatedAt: DateTime.now(),
+    );
+
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      body: BlocBuilder<AuthBloc, AuthState>(
-        builder: (context, state) {
-          if (state is AuthAuthenticated) {
-            return ProfileContent(user: state.user);
-          } else {
-            return const Center(child: Text('User not authenticated'));
-          }
-        },
-      ),
+      body: ProfileContent(user: demoUser),
     );
   }
 }
@@ -347,7 +346,12 @@ class ProfileLogoutDialog extends StatelessWidget {
         TextButton(
           onPressed: () {
             Navigator.pop(context);
-            context.read<AuthBloc>().add(const LogoutEvent());
+            // Navigation vers la page de connexion
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              AppRoutes.login,
+              (route) => false,
+            );
           },
           style: TextButton.styleFrom(foregroundColor: Colors.red),
           child: const Text('Logout'),

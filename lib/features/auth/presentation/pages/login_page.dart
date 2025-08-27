@@ -1,12 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../domain/entities/auth_credentials.dart';
-import '../bloc/auth_bloc.dart';
-import '../bloc/auth_event.dart';
-import '../bloc/auth_state.dart';
 import '../../../blog/presentation/widgets/custom_text_field.dart';
 import '../../../blog/presentation/widgets/action_button.dart';
-import 'signup_page.dart';
+import '../../../../core/routes/app_routes.dart';
 
 /// Page de connexion
 class LoginPage extends StatefulWidget {
@@ -18,8 +13,9 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  final _emailController = TextEditingController(text: "saliou@exemple.com");
   final _passwordController = TextEditingController();
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -28,41 +24,51 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
+  Future<void> _handleLogin() async {
+    if (_formKey.currentState?.validate() ?? false) {
+      setState(() {
+        _isLoading = true;
+      });
+
+      // Simulation d'une connexion
+      await Future.delayed(const Duration(seconds: 1));
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+
+        // Navigation vers la liste des blogs
+        Navigator.pushReplacementNamed(context, AppRoutes.blogList);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: BlocListener<AuthBloc, AuthState>(
-        listener: (context, state) {
-          if (state is AuthError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-        },
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 40),
-                const LoginHeader(),
-                const SizedBox(height: 40),
-                Expanded(
-                  child: LoginForm(
-                    formKey: _formKey,
-                    emailController: _emailController,
-                    passwordController: _passwordController,
-                  ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 40),
+              const LoginHeader(),
+              const SizedBox(height: 40),
+              Expanded(
+                child: LoginForm(
+                  formKey: _formKey,
+                  emailController: _emailController,
+                  passwordController: _passwordController,
+                  onLogin: _handleLogin,
+                  isLoading: _isLoading,
                 ),
-                const LoginSignUpLink(),
-                const SizedBox(height: 16),
-              ],
-            ),
+              ),
+              const LoginSignUpLink(),
+              const SizedBox(height: 16),
+            ],
           ),
         ),
       ),
@@ -104,12 +110,16 @@ class LoginForm extends StatelessWidget {
   final GlobalKey<FormState> formKey;
   final TextEditingController emailController;
   final TextEditingController passwordController;
+  final VoidCallback onLogin;
+  final bool isLoading;
 
   const LoginForm({
     super.key,
     required this.formKey,
     required this.emailController,
     required this.passwordController,
+    required this.onLogin,
+    required this.isLoading,
   });
 
   @override
@@ -127,6 +137,8 @@ class LoginForm extends StatelessWidget {
             formKey: formKey,
             emailController: emailController,
             passwordController: passwordController,
+            onLogin: onLogin,
+            isLoading: isLoading,
           ),
         ],
       ),
@@ -212,31 +224,27 @@ class LoginButton extends StatelessWidget {
   final GlobalKey<FormState> formKey;
   final TextEditingController emailController;
   final TextEditingController passwordController;
+  final VoidCallback onLogin;
+  final bool isLoading;
 
   const LoginButton({
     super.key,
     required this.formKey,
     required this.emailController,
     required this.passwordController,
+    required this.onLogin,
+    required this.isLoading,
   });
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<AuthBloc, AuthState>(
-      builder: (context, state) {
-        return ActionButton(
-          text: 'Login',
-          isLoading: state is AuthLoading,
-          onPressed: () {
-            if (formKey.currentState?.validate() ?? false) {
-              final credentials = AuthCredentials(
-                email: emailController.text.trim(),
-                password: passwordController.text,
-              );
-              context.read<AuthBloc>().add(LoginEvent(credentials));
-            }
-          },
-        );
+    return ActionButton(
+      text: 'Login',
+      isLoading: isLoading,
+      onPressed: () {
+        if (formKey.currentState?.validate() ?? false) {
+          onLogin();
+        }
       },
     );
   }
@@ -257,10 +265,7 @@ class LoginSignUpLink extends StatelessWidget {
         ),
         GestureDetector(
           onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const SignUpPage()),
-            );
+            Navigator.pushNamed(context, AppRoutes.signUp);
           },
           child: const Text(
             'Sign up',

@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../domain/entities/auth_credentials.dart';
-import '../bloc/auth_bloc.dart';
-import '../bloc/auth_event.dart';
-import '../bloc/auth_state.dart';
 import '../../../blog/presentation/widgets/custom_text_field.dart';
 import '../../../blog/presentation/widgets/action_button.dart';
+import '../../../../core/routes/app_routes.dart';
 
 /// Page d'inscription
 class SignUpPage extends StatefulWidget {
@@ -19,8 +15,9 @@ class _SignUpPageState extends State<SignUpPage> {
   final _formKey = GlobalKey<FormState>();
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
-  final _emailController = TextEditingController();
+  final _emailController = TextEditingController(text: "saliou@exemple.com");
   final _passwordController = TextEditingController();
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -31,50 +28,60 @@ class _SignUpPageState extends State<SignUpPage> {
     super.dispose();
   }
 
+  Future<void> _handleSignUp() async {
+    if (_formKey.currentState?.validate() ?? false) {
+      setState(() {
+        _isLoading = true;
+      });
+
+      // Simulation d'une inscription
+      await Future.delayed(const Duration(seconds: 1));
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+
+        // Navigation vers la liste des blogs
+        Navigator.pushReplacementNamed(context, AppRoutes.blogList);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: BlocListener<AuthBloc, AuthState>(
-        listener: (context, state) {
-          if (state is AuthError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-        },
-        child: SafeArea(
-          child: Column(
-            children: [
-              SignUpAppBar(),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SignUpHeader(),
-                      const SizedBox(height: 32),
-                      Expanded(
-                        child: SignUpForm(
-                          formKey: _formKey,
-                          firstNameController: _firstNameController,
-                          lastNameController: _lastNameController,
-                          emailController: _emailController,
-                          passwordController: _passwordController,
-                        ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            SignUpAppBar(),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SignUpHeader(),
+                    const SizedBox(height: 32),
+                    Expanded(
+                      child: SignUpForm(
+                        formKey: _formKey,
+                        firstNameController: _firstNameController,
+                        lastNameController: _lastNameController,
+                        emailController: _emailController,
+                        passwordController: _passwordController,
+                        onSignUp: _handleSignUp,
+                        isLoading: _isLoading,
                       ),
-                      const SignUpLoginLink(),
-                      const SizedBox(height: 16),
-                    ],
-                  ),
+                    ),
+                    const SignUpLoginLink(),
+                    const SizedBox(height: 16),
+                  ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -143,6 +150,8 @@ class SignUpForm extends StatelessWidget {
   final TextEditingController lastNameController;
   final TextEditingController emailController;
   final TextEditingController passwordController;
+  final VoidCallback onSignUp;
+  final bool isLoading;
 
   const SignUpForm({
     super.key,
@@ -151,6 +160,8 @@ class SignUpForm extends StatelessWidget {
     required this.lastNameController,
     required this.emailController,
     required this.passwordController,
+    required this.onSignUp,
+    required this.isLoading,
   });
 
   @override
@@ -182,6 +193,8 @@ class SignUpForm extends StatelessWidget {
             lastNameController: lastNameController,
             emailController: emailController,
             passwordController: passwordController,
+            onSignUp: onSignUp,
+            isLoading: isLoading,
           ),
         ],
       ),
@@ -340,6 +353,8 @@ class SignUpButton extends StatelessWidget {
   final TextEditingController lastNameController;
   final TextEditingController emailController;
   final TextEditingController passwordController;
+  final VoidCallback onSignUp;
+  final bool isLoading;
 
   const SignUpButton({
     super.key,
@@ -348,27 +363,19 @@ class SignUpButton extends StatelessWidget {
     required this.lastNameController,
     required this.emailController,
     required this.passwordController,
+    required this.onSignUp,
+    required this.isLoading,
   });
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<AuthBloc, AuthState>(
-      builder: (context, state) {
-        return ActionButton(
-          text: 'Sign up',
-          isLoading: state is AuthLoading,
-          onPressed: () {
-            if (formKey.currentState?.validate() ?? false) {
-              final signUpData = SignUpData(
-                firstName: firstNameController.text.trim(),
-                lastName: lastNameController.text.trim(),
-                email: emailController.text.trim(),
-                password: passwordController.text,
-              );
-              context.read<AuthBloc>().add(SignUpEvent(signUpData));
-            }
-          },
-        );
+    return ActionButton(
+      text: 'Sign up',
+      isLoading: isLoading,
+      onPressed: () {
+        if (formKey.currentState?.validate() ?? false) {
+          onSignUp();
+        }
       },
     );
   }

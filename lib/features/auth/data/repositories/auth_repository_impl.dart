@@ -1,114 +1,112 @@
+import 'dart:convert';
+
 import '../../../../core/resources/data_state.dart';
+import '../../../../core/config/network/errors/network_exceptions.dart';
+import '../../../../core/config/storage/secure_storage.dart';
 import '../../domain/entities/auth_credentials.dart';
 import '../../domain/entities/user.dart';
 import '../../domain/repositories/auth_repository.dart';
+import '../datasources/auth_remote_data_source.dart';
+import '../models/user_model.dart';
 
-/// Implémentation mock du repository d'authentification
+/// Implémentation du repository d'authentification avec networking
 class AuthRepositoryImpl implements AuthRepository {
-  // Simulation d'une base de données en mémoire
-  static final Map<String, User> _users = {};
-  static User? _currentUser;
+  final AuthRemoteDataSource _remoteDataSource;
+  final SecureStorage _secureStorage;
+
+  AuthRepositoryImpl({
+    required AuthRemoteDataSource remoteDataSource,
+    required SecureStorage secureStorage,
+  }) : _remoteDataSource = remoteDataSource,
+       _secureStorage = secureStorage;
 
   @override
   Future<DataState<User>> login(AuthCredentials credentials) async {
     try {
-      // Simuler un délai réseau
-      await Future.delayed(const Duration(milliseconds: 800));
-
-      // Vérifier les identifiants
-      final user = _users.values.firstWhere(
-        (user) => user.email == credentials.email,
-        orElse: () => throw Exception('User not found'),
+      final response = await _remoteDataSource.login(
+        email: credentials.email,
+        password: credentials.password,
       );
 
-      // En production, vérifier le mot de passe hashé
-      // Pour la démo, on accepte tout mot de passe
-      _currentUser = user;
+      if (response['user'] != null) {
+        final userModel = UserModel.fromJson(response['user']);
 
-      return DataSuccess(user);
+        // Sauvegarder l'utilisateur connecté dans le stockage sécurisé
+        await _secureStorage.saveCurrentUser(jsonEncode(userModel.toJson()));
+
+        return DataSuccess(userModel);
+      } else {
+        return DataFailed('Données utilisateur manquantes');
+      }
+    } on AuthException catch (e) {
+      return DataFailed(e.message);
+    } on NetworkException catch (e) {
+      return DataFailed(e.message);
     } catch (e) {
-      return DataFailed('Invalid email or password');
+      return DataFailed('Erreur de connexion: ${e.toString()}');
     }
   }
 
   @override
   Future<DataState<User>> signUp(SignUpData signUpData) async {
     try {
-      // Simuler un délai réseau
-      await Future.delayed(const Duration(milliseconds: 800));
-
-      // Vérifier si l'email existe déjà
-      if (_users.values.any((user) => user.email == signUpData.email)) {
-        return DataFailed('Email already exists');
-      }
-
-      // Créer un nouvel utilisateur
-      final user = User(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
+      final response = await _remoteDataSource.signUp(
         firstName: signUpData.firstName,
         lastName: signUpData.lastName,
         email: signUpData.email,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
+        password: signUpData.password,
       );
 
-      // Sauvegarder l'utilisateur
-      _users[user.id] = user;
-      _currentUser = user;
+      if (response['user'] != null) {
+        final userModel = UserModel.fromJson(response['user']);
 
-      return DataSuccess(user);
+        // Sauvegarder l'utilisateur connecté dans le stockage sécurisé
+        await _secureStorage.saveCurrentUser(jsonEncode(userModel.toJson()));
+
+        return DataSuccess(userModel);
+      } else {
+        return DataFailed('Échec de l\'inscription');
+      }
+    } on AuthException catch (e) {
+      return DataFailed(e.message);
+    } on NetworkException catch (e) {
+      return DataFailed(e.message);
     } catch (e) {
-      return DataFailed('Failed to create account');
+      return DataFailed('Erreur d\'inscription: ${e.toString()}');
     }
   }
 
   @override
   Future<DataState<void>> logout() async {
     try {
-      // Simuler un délai
-      await Future.delayed(const Duration(milliseconds: 300));
+      await _remoteDataSource.logout();
 
-      _currentUser = null;
+      // Nettoyer toutes les données d'authentification du stockage sécurisé
+      await _secureStorage.clearAuthData();
+
       return DataSuccess(null);
     } catch (e) {
-      return DataFailed('Failed to logout');
+      return DataFailed('Erreur lors de la déconnexion: ${e.toString()}');
     }
   }
 
   @override
   Future<DataState<User?>> getCurrentUser() async {
     try {
-      // Simuler un délai
-      await Future.delayed(const Duration(milliseconds: 200));
+      // D'abord essayer de récupérer l'utilisateur depuis le stockage local
+      final userJson = await _secureStorage.getCurrentUser();
 
-      return DataSuccess(_currentUser);
-    } catch (e) {
-      return DataFailed('Failed to get current user');
-    }
-  }
-
-  @override
-  Future<bool> isLoggedIn() async {
-    return _currentUser != null;
-  }
-
-  @override
-  Future<DataState<User>> updateProfile(User user) async {
-    try {
-      // Simuler un délai réseau
-      await Future.delayed(const Duration(milliseconds: 600));
-
-      // Mettre à jour l'utilisateur
-      final updatedUser = user.copyWith(updatedAt: DateTime.now());
-      _users[user.id] = updatedUser;
-
-      if (_currentUser?.id == user.id) {
-        _currentUser = updatedUser;
+      if (userJson != null && userJson.isNotEmpty) {
+        final userModel = UserModel.fromJson(jsonDecode(userJson));
+        return DataSuccess(userModel);
       }
 
-      return DataSuccess(updatedUser);
+      // Aucun utilisateur trouvé
+      return DataSuccess(null);
     } catch (e) {
-      return DataFailed('Failed to update profile');
+      return DataFailed(
+        'Impossible de récupérer les données utilisateur: ${e.toString()}',
+      );
     }
   }
 }

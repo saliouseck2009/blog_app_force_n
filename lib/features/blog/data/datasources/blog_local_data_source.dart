@@ -20,3 +20,45 @@ abstract class BlogLocalDataSource {
   /// Nettoie tout le cache
   Future<void> clearCache();
 }
+
+/// Implémentation du cache local pour les blog posts
+class BlogLocalDataSourceImpl implements BlogLocalDataSource {
+  static List<BlogPostModel> _cache = [];
+
+  @override
+  Future<void> cacheBlogPost(BlogPostModel blogPost) async {
+    _cache.removeWhere((post) => post.id == blogPost.id);
+    _cache.add(blogPost);
+  }
+
+  @override
+  Future<void> cacheBlogPosts(List<BlogPostModel> blogPosts) async {
+    _cache = blogPosts;
+  }
+
+  @override
+  Future<void> clearCache() async {
+    _cache.clear();
+  }
+
+  @override
+  Future<List<BlogPostModel>> getAllBlogPosts() async {
+    if (_cache.isEmpty) {
+      throw Exception('Pas de données en cache');
+    }
+    return _cache;
+  }
+
+  @override
+  Future<BlogPostModel> getBlogPostById(int id) async {
+    if (_cache.isEmpty) {
+      throw Exception('Pas de données en cache');
+    }
+    return _cache.firstWhere((post) => post.id == id);
+  }
+
+  @override
+  Future<void> removeBlogPost(int id) async {
+    _cache.removeWhere((post) => post.id == id);
+  }
+}

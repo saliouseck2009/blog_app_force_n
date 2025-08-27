@@ -1,113 +1,90 @@
-import '../../../../core/network/network_info.dart';
 import '../../../../core/resources/data_state.dart';
 import '../../domain/entities/blog_post.dart';
 import '../../domain/repositories/blog_repository.dart';
-import '../datasources/blog_local_data_source.dart';
 import '../datasources/blog_remote_data_source.dart';
+import '../models/blog_post_model.dart';
 
 /// Implémentation concrète du repository des blog posts
 class BlogRepositoryImpl implements BlogRepository {
   final BlogRemoteDataSource remoteDataSource;
-  final BlogLocalDataSource localDataSource;
-  final NetworkInfo networkInfo;
 
-  BlogRepositoryImpl({
-    required this.remoteDataSource,
-    required this.localDataSource,
-    required this.networkInfo,
-  });
+  BlogRepositoryImpl({required this.remoteDataSource});
 
   @override
   Future<DataState<List<BlogPost>>> getAllBlogPosts() async {
-    if (await networkInfo.isConnected) {
-      try {
-        final remoteBlogPosts = await remoteDataSource.getAllBlogPosts();
-        await localDataSource.cacheBlogPosts(remoteBlogPosts);
-        return DataSuccess(remoteBlogPosts);
-      } catch (e) {
-        return DataFailed('Erreur serveur: ${e.toString()}');
-      }
-    } else {
-      try {
-        final localBlogPosts = await localDataSource.getAllBlogPosts();
-        return DataSuccess(localBlogPosts);
-      } catch (e) {
-        return DataFailed('Erreur cache: ${e.toString()}');
-      }
+    try {
+      final remoteBlogPosts = await remoteDataSource.getAllBlogPosts();
+      return DataSuccess(remoteBlogPosts);
+    } catch (e) {
+      return DataFailed('Erreur serveur: ${e.toString()}');
     }
   }
 
   @override
   Future<DataState<BlogPost>> getBlogPostById(int id) async {
-    if (await networkInfo.isConnected) {
-      try {
-        final remoteBlogPost = await remoteDataSource.getBlogPostById(id);
-        await localDataSource.cacheBlogPost(remoteBlogPost);
-        return DataSuccess(remoteBlogPost);
-      } catch (e) {
-        return DataFailed('Erreur serveur: ${e.toString()}');
-      }
-    } else {
-      try {
-        final localBlogPost = await localDataSource.getBlogPostById(id);
-        return DataSuccess(localBlogPost);
-      } catch (e) {
-        return DataFailed('Erreur cache: ${e.toString()}');
-      }
+    try {
+      final remoteBlogPost = await remoteDataSource.getBlogPostById(id);
+      return DataSuccess(remoteBlogPost);
+    } catch (e) {
+      return DataFailed('Erreur serveur: ${e.toString()}');
     }
   }
 
   @override
   Future<DataState<BlogPost>> createBlogPost(BlogPost blogPost) async {
-    if (await networkInfo.isConnected) {
-      try {
-        final remoteBlogPost = await remoteDataSource.createBlogPost(
-          _toModel(blogPost),
-        );
-        await localDataSource.cacheBlogPost(remoteBlogPost);
-        return DataSuccess(remoteBlogPost);
-      } catch (e) {
-        return DataFailed('Erreur serveur: ${e.toString()}');
-      }
-    } else {
-      return DataFailed('Pas de connexion internet');
+    try {
+      final remoteBlogPost = await remoteDataSource.createBlogPost(
+        _toModel(blogPost),
+      );
+      return DataSuccess(remoteBlogPost);
+    } catch (e) {
+      return DataFailed('Erreur serveur: ${e.toString()}');
     }
   }
 
   @override
   Future<DataState<BlogPost>> updateBlogPost(BlogPost blogPost) async {
-    if (await networkInfo.isConnected) {
-      try {
-        final remoteBlogPost = await remoteDataSource.updateBlogPost(
-          _toModel(blogPost),
-        );
-        await localDataSource.cacheBlogPost(remoteBlogPost);
-        return DataSuccess(remoteBlogPost);
-      } catch (e) {
-        return DataFailed('Erreur serveur: ${e.toString()}');
-      }
-    } else {
-      return DataFailed('Pas de connexion internet');
+    try {
+      final remoteBlogPost = await remoteDataSource.updateBlogPost(
+        _toModel(blogPost),
+      );
+      return DataSuccess(remoteBlogPost);
+    } catch (e) {
+      return DataFailed('Erreur serveur: ${e.toString()}');
     }
   }
 
   @override
   Future<DataState<void>> deleteBlogPost(int id) async {
-    if (await networkInfo.isConnected) {
-      try {
-        await remoteDataSource.deleteBlogPost(id);
-        await localDataSource.removeBlogPost(id);
-        return DataSuccess(null);
-      } catch (e) {
-        return DataFailed('Erreur serveur: ${e.toString()}');
-      }
-    } else {
-      return DataFailed('Pas de connexion internet');
+    try {
+      await remoteDataSource.deleteBlogPost(id);
+      return DataSuccess(null);
+    } catch (e) {
+      return DataFailed('Erreur serveur: ${e.toString()}');
     }
   }
 
-  /// Convertit une entité BlogPost en BlogPostModel
-  _toModel(BlogPost blogPost) {
-    return blogPost;
+  @override
+  Future<DataState<List<BlogPost>>> searchBlogPosts(String query) async {
+    try {
+      final remoteBlogPosts = await remoteDataSource.searchBlogPosts(query);
+      return DataSuccess(remoteBlogPosts);
+    } catch (e) {
+      return DataFailed('Erreur serveur: ${e.toString()}');
+    }
+  }
+
+  /// Convertit une entité BlogPost en modèle BlogPostModel
+  BlogPostModel _toModel(BlogPost blogPost) {
+    return BlogPostModel(
+      id: blogPost.id,
+      title: blogPost.title,
+      content: blogPost.content,
+      author: blogPost.author,
+      createdAt: blogPost.createdAt,
+      updatedAt: blogPost.updatedAt,
+      tags: blogPost.tags,
+      imageUrl: blogPost.imageUrl,
+    );
   }
 }

@@ -26,20 +26,46 @@ class _BlogPostFormPageState extends State<BlogPostFormPage> {
   /// Retourne true si on est en mode édition
   bool get _isEditMode => widget.blogPost != null;
 
-  /// Retourne le titre de la page
-  String get _pageTitle => _isEditMode ? 'Edit Post' : 'New Post';
-
-  /// Retourne le texte du bouton
-  String get _buttonText => _isEditMode ? 'Edit' : 'Save';
-
-  /// Retourne le message de succès
-  String get _successMessage =>
-      _isEditMode ? 'Post updated successfully!' : 'Post created successfully!';
-
   @override
   void initState() {
     super.initState();
     _initializeControllers();
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _contentController.dispose();
+    _authorController.dispose();
+    _tagsController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Column(
+        children: [
+          _FormPageHeader(isEditMode: _isEditMode),
+          Expanded(
+            child: _FormContent(
+              formKey: _formKey,
+              titleController: _titleController,
+              contentController: _contentController,
+              authorController: _authorController,
+              tagsController: _tagsController,
+              isEditMode: _isEditMode,
+            ),
+          ),
+          _FormActions(
+            onSubmit: _handleSubmit,
+            isEditMode: _isEditMode,
+            isLoading: _isLoading,
+          ),
+        ],
+      ),
+    );
   }
 
   void _initializeControllers() {
@@ -60,42 +86,6 @@ class _BlogPostFormPageState extends State<BlogPostFormPage> {
       tagsText = tags.join(', ');
     }
     _tagsController = TextEditingController(text: tagsText);
-  }
-
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _contentController.dispose();
-    _authorController.dispose();
-    _tagsController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Column(
-        children: [
-          PageHeader(title: _pageTitle),
-          Expanded(
-            child: BlogPostForm(
-              formKey: _formKey,
-              titleController: _titleController,
-              contentController: _contentController,
-              authorController: _authorController,
-              tagsController: _tagsController,
-              isEdit: _isEditMode,
-            ),
-          ),
-          FormBottomSection(
-            onPressed: _handleSubmit,
-            buttonText: _buttonText,
-            isLoading: _isLoading,
-          ),
-        ],
-      ),
-    );
   }
 
   void _handleSubmit() async {
@@ -140,14 +130,84 @@ class _BlogPostFormPageState extends State<BlogPostFormPage> {
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_successMessage),
-            backgroundColor: Colors.green,
-          ),
-        );
+        _showSuccessMessage();
         Navigator.pop(context);
       }
     }
+  }
+
+  void _showSuccessMessage() {
+    final message = _isEditMode
+        ? 'Post updated successfully!'
+        : 'Post created successfully!';
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.green),
+    );
+  }
+}
+
+class _FormPageHeader extends StatelessWidget {
+  final bool isEditMode;
+
+  const _FormPageHeader({required this.isEditMode});
+
+  @override
+  Widget build(BuildContext context) {
+    final title = isEditMode ? 'Edit Post' : 'New Post';
+    return PageHeader(title: title);
+  }
+}
+
+class _FormContent extends StatelessWidget {
+  final GlobalKey<FormState> formKey;
+  final TextEditingController titleController;
+  final TextEditingController contentController;
+  final TextEditingController authorController;
+  final TextEditingController tagsController;
+  final bool isEditMode;
+
+  const _FormContent({
+    required this.formKey,
+    required this.titleController,
+    required this.contentController,
+    required this.authorController,
+    required this.tagsController,
+    required this.isEditMode,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return BlogPostForm(
+      formKey: formKey,
+      titleController: titleController,
+      contentController: contentController,
+      authorController: authorController,
+      tagsController: tagsController,
+      isEdit: isEditMode,
+    );
+  }
+}
+
+class _FormActions extends StatelessWidget {
+  final VoidCallback onSubmit;
+  final bool isEditMode;
+  final bool isLoading;
+
+  const _FormActions({
+    required this.onSubmit,
+    required this.isEditMode,
+    required this.isLoading,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final buttonText = isEditMode ? 'Edit' : 'Save';
+
+    return FormBottomSection(
+      onPressed: onSubmit,
+      buttonText: buttonText,
+      isLoading: isLoading,
+    );
   }
 }

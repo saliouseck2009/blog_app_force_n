@@ -43,6 +43,12 @@ dependencies:
   
   # Network
   http: ^1.2.1
+  dio: ^5.7.0
+  pretty_dio_logger: ^1.4.0
+  
+  # Local storage  
+  shared_preferences: ^2.2.2
+  flutter_secure_storage: ^9.2.2
   
   # Service locator
   get_it: ^7.7.0

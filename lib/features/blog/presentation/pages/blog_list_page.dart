@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import '../bloc/blog_bloc.dart';
-import '../bloc/blog_event.dart';
-import '../bloc/blog_state.dart';
 import '../widgets/blog_post_card.dart';
-import 'blog_post_form_page.dart';
-import '../../../auth/presentation/pages/profile_page.dart';
+import '../../../../core/routes/app_routes.dart';
+import '../../domain/entities/blog_post.dart';
 
 class BlogListPage extends StatelessWidget {
   const BlogListPage({super.key});
@@ -17,169 +13,202 @@ class BlogListPage extends StatelessWidget {
       body: SafeArea(
         child: Column(
           children: [
-            // Header personnalisé
-            Container(
-              color: Colors.white,
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  // Top bar avec avatar et titre
-                  Row(
-                    children: [
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const ProfilePage(),
-                            ),
-                          );
-                        },
-                        child: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: Colors.blue[100],
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.person,
-                            color: Colors.blue[700],
-                            size: 24,
-                          ),
-                        ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        'Bloggr',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black,
-                        ),
-                      ),
-                      const Spacer(),
-                      const SizedBox(width: 40), // Balance l'avatar
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Barre de recherche
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(25),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.search, color: Colors.grey[500], size: 20),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'Search blog posts',
-                            style: TextStyle(
-                              color: Colors.grey[500],
-                              fontSize: 16,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Contenu principal
-            Expanded(
-              child: BlocBuilder<BlogBloc, BlogState>(
-                builder: (context, state) {
-                  if (state is BlogInitial) {
-                    // Déclencer le chargement initial
-                    context.read<BlogBloc>().add(GetAllBlogPostsEvent());
-                    return const Center(child: CircularProgressIndicator());
-                  } else if (state is BlogLoading) {
-                    return const Center(child: CircularProgressIndicator());
-                  } else if (state is BlogLoaded) {
-                    if (state.blogPosts.isEmpty) {
-                      return const Center(
-                        child: Text(
-                          'Aucun blog post trouvé',
-                          style: TextStyle(fontSize: 18),
-                        ),
-                      );
-                    }
-                    return RefreshIndicator(
-                      onRefresh: () async {
-                        context.read<BlogBloc>().add(RefreshBlogPostsEvent());
-                      },
-                      child: ListView.builder(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        itemCount: state.blogPosts.length,
-                        itemBuilder: (context, index) {
-                          final blogPost = state.blogPosts[index];
-                          return BlogPostCard(blogPost: blogPost);
-                        },
-                      ),
-                    );
-                  } else if (state is BlogError) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.error_outline,
-                            size: 64,
-                            color: Colors.red[300],
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Erreur',
-                            style: Theme.of(context).textTheme.headlineSmall,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            state.message,
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                          const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: () {
-                              context.read<BlogBloc>().add(
-                                GetAllBlogPostsEvent(),
-                              );
-                            },
-                            child: const Text('Réessayer'),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-                  return const SizedBox.shrink();
-                },
-              ),
-            ),
+            _BlogListHeader(),
+            Expanded(child: _BlogListContent()),
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) =>
-                  const BlogPostFormPage(), // Pas de blogPost = mode création
-            ),
-          );
-        },
-        tooltip: 'Ajouter un blog post',
-        backgroundColor: Colors.blue[600],
-        child: const Icon(Icons.add, color: Colors.white),
+      floatingActionButton: _AddPostButton(),
+    );
+  }
+}
+
+class _BlogListHeader extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [_TopBar(), const SizedBox(height: 16), _SearchBar()],
       ),
     );
   }
+}
+
+class _TopBar extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        _ProfileAvatar(),
+        const Spacer(),
+        _AppTitle(),
+        const Spacer(),
+        const SizedBox(width: 40), // Balance l'avatar
+      ],
+    );
+  }
+}
+
+class _ProfileAvatar extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.pushNamed(context, AppRoutes.profile);
+      },
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: Colors.blue[100],
+          shape: BoxShape.circle,
+        ),
+        child: Icon(Icons.person, color: Colors.blue[700], size: 24),
+      ),
+    );
+  }
+}
+
+class _AppTitle extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      'Bloggr',
+      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+        fontWeight: FontWeight.bold,
+        color: Colors.black,
+      ),
+    );
+  }
+}
+
+class _SearchBar extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(25),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.search, color: Colors.grey[500], size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Search blog posts',
+              style: TextStyle(color: Colors.grey[500], fontSize: 16),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BlogListContent extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final demoPosts = _DemoBlogPosts();
+
+    return RefreshIndicator(
+      onRefresh: _handleRefresh,
+      child: demoPosts.isEmpty
+          ? _EmptyState()
+          : _BlogPostsList(blogPosts: demoPosts()),
+    );
+  }
+
+  Future<void> _handleRefresh() async {
+    // Simulation d'un rafraîchissement
+    await Future.delayed(const Duration(seconds: 1));
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Text('Aucun blog post trouvé', style: TextStyle(fontSize: 18)),
+    );
+  }
+}
+
+class _BlogPostsList extends StatelessWidget {
+  final List<BlogPost> blogPosts;
+
+  const _BlogPostsList({required this.blogPosts});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      itemCount: blogPosts.length,
+      itemBuilder: (context, index) {
+        final blogPost = blogPosts[index];
+        return BlogPostCard(blogPost: blogPost);
+      },
+    );
+  }
+}
+
+class _AddPostButton extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return FloatingActionButton(
+      onPressed: () {
+        Navigator.pushNamed(
+          context,
+          AppRoutes.blogForm,
+          arguments:
+              BlogPostFormPageArguments(), // Pas de blogPost = mode création
+        );
+      },
+      tooltip: 'Ajouter un blog post',
+      backgroundColor: Colors.blue[600],
+      child: const Icon(Icons.add, color: Colors.white),
+    );
+  }
+}
+
+// Widget helper pour les données de démonstration
+class _DemoBlogPosts {
+  static List<BlogPost> get _demoBlogPosts => [
+    BlogPost(
+      id: 1,
+      title: 'Introduction to Flutter Clean Architecture',
+      content:
+          'Flutter Clean Architecture is a powerful way to structure your Flutter applications...',
+      author: 'John Doe',
+      tags: ['Flutter', 'Architecture', 'Development'],
+      createdAt: DateTime.now().subtract(const Duration(hours: 2)),
+      updatedAt: DateTime.now().subtract(const Duration(hours: 2)),
+    ),
+    BlogPost(
+      id: 2,
+      title: 'Understanding State Management in Flutter',
+      content:
+          'State management is one of the most important concepts in Flutter development...',
+      author: 'Jane Smith',
+      tags: ['Flutter', 'State Management', 'BLoC'],
+      createdAt: DateTime.now().subtract(const Duration(days: 1)),
+      updatedAt: DateTime.now().subtract(const Duration(days: 1)),
+    ),
+    BlogPost(
+      id: 3,
+      title: 'Building Responsive UIs with Flutter',
+      content:
+          'Creating responsive user interfaces is crucial for modern mobile applications...',
+      author: 'John Doe',
+      tags: ['Flutter', 'UI', 'Responsive Design'],
+      createdAt: DateTime.now().subtract(const Duration(days: 3)),
+      updatedAt: DateTime.now().subtract(const Duration(days: 3)),
+    ),
+  ];
+
+  List<BlogPost> call() => _demoBlogPosts;
+  bool get isEmpty => _demoBlogPosts.isEmpty;
 }

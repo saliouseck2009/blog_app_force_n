@@ -15,10 +15,4 @@ abstract class AuthRepository {
 
   /// Obtenir l'utilisateur actuellement connecté
   Future<DataState<User?>> getCurrentUser();
-
-  /// Vérifier si un utilisateur est connecté
-  Future<bool> isLoggedIn();
-
-  /// Mettre à jour le profil utilisateur
-  Future<DataState<User>> updateProfile(User user);
 }

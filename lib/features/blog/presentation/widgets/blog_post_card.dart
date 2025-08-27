@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../domain/entities/blog_post.dart';
-import '../pages/blog_detail_page.dart';
+import '../../../../core/routes/app_routes.dart';
 
 /// Widget card pour afficher un blog post dans la liste
 class BlogPostCard extends StatelessWidget {
@@ -20,11 +20,10 @@ class BlogPostCard extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () {
-          Navigator.push(
+          Navigator.pushNamed(
             context,
-            MaterialPageRoute(
-              builder: (context) => BlogDetailPage(blogPost: blogPost),
-            ),
+            AppRoutes.blogDetail,
+            arguments: BlogDetailPageArguments(blogPost: blogPost),
           );
         },
         child: Padding(
@@ -41,7 +40,7 @@ class BlogPostCard extends StatelessWidget {
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [Colors.green.shade300, Colors.green.shade600],
+                    colors: [Colors.blue.shade300, Colors.blue.shade600],
                   ),
                 ),
                 child: const Icon(
