@@ -2,9 +2,92 @@ import 'package:flutter/material.dart';
 import '../widgets/blog_post_card.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../domain/entities/blog_post.dart';
+import '../../domain/usecases/get_all_blog_posts.dart';
+import '../../domain/usecases/search_blog_posts_usecase.dart';
+import '../../../../core/usecases/usecase.dart';
+import '../../../../core/resources/data_state.dart';
+import '../../../../injection_container.dart';
 
-class BlogListPage extends StatelessWidget {
+class BlogListPage extends StatefulWidget {
   const BlogListPage({super.key});
+
+  @override
+  State<BlogListPage> createState() => _BlogListPageState();
+}
+
+class _BlogListPageState extends State<BlogListPage> {
+  List<BlogPost> _blogPosts = [];
+  bool _isLoading = true;
+  String _errorMessage = '';
+  String _searchQuery = '';
+  bool _isSearching = false;
+
+  final GetAllBlogPosts _getAllBlogPostsUseCase = sl<GetAllBlogPosts>();
+  final SearchBlogPostsUseCase _searchBlogPostsUseCase =
+      sl<SearchBlogPostsUseCase>();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBlogPosts();
+  }
+
+  Future<void> _loadBlogPosts() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
+
+    final dataState = await _getAllBlogPostsUseCase(NoParams());
+
+    if (dataState is DataSuccess<List<BlogPost>>) {
+      setState(() {
+        _blogPosts = dataState.data!;
+        _isLoading = false;
+      });
+    } else if (dataState is DataFailed) {
+      setState(() {
+        _errorMessage = dataState.error!;
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _searchBlogPosts(String query) async {
+    if (query.isEmpty) {
+      _loadBlogPosts();
+      return;
+    }
+
+    setState(() {
+      _isSearching = true;
+      _searchQuery = query;
+    });
+
+    final dataState = await _searchBlogPostsUseCase(
+      SearchBlogPostsParams(query: query),
+    );
+
+    if (dataState is DataSuccess<List<BlogPost>>) {
+      setState(() {
+        _blogPosts = dataState.data!;
+        _isSearching = false;
+      });
+    } else if (dataState is DataFailed) {
+      setState(() {
+        _errorMessage = dataState.error!;
+        _isSearching = false;
+      });
+    }
+  }
+
+  Future<void> _refreshBlogPosts() async {
+    if (_searchQuery.isEmpty) {
+      await _loadBlogPosts();
+    } else {
+      await _searchBlogPosts(_searchQuery);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -13,24 +96,43 @@ class BlogListPage extends StatelessWidget {
       body: SafeArea(
         child: Column(
           children: [
-            _BlogListHeader(),
-            Expanded(child: _BlogListContent()),
+            _BlogListHeader(
+              onSearch: _searchBlogPosts,
+              isSearching: _isSearching,
+            ),
+            Expanded(
+              child: _BlogListContent(
+                blogPosts: _blogPosts,
+                isLoading: _isLoading,
+                errorMessage: _errorMessage,
+                onRefresh: _refreshBlogPosts,
+              ),
+            ),
           ],
         ),
       ),
-      floatingActionButton: _AddPostButton(),
+      floatingActionButton: _AddPostButton(onPostAdded: _loadBlogPosts),
     );
   }
 }
 
 class _BlogListHeader extends StatelessWidget {
+  final Function(String) onSearch;
+  final bool isSearching;
+
+  const _BlogListHeader({required this.onSearch, required this.isSearching});
+
   @override
   Widget build(BuildContext context) {
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.all(16),
       child: Column(
-        children: [_TopBar(), const SizedBox(height: 16), _SearchBar()],
+        children: [
+          _TopBar(),
+          const SizedBox(height: 16),
+          _SearchBar(onSearch: onSearch, isSearching: isSearching),
+        ],
       ),
     );
   }
@@ -84,7 +186,29 @@ class _AppTitle extends StatelessWidget {
   }
 }
 
-class _SearchBar extends StatelessWidget {
+class _SearchBar extends StatefulWidget {
+  final Function(String) onSearch;
+  final bool isSearching;
+
+  const _SearchBar({required this.onSearch, required this.isSearching});
+
+  @override
+  State<_SearchBar> createState() => _SearchBarState();
+}
+
+class _SearchBarState extends State<_SearchBar> {
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _handleSearch(String query) {
+    widget.onSearch(query.trim());
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -95,14 +219,33 @@ class _SearchBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.search, color: Colors.grey[500], size: 20),
+          Icon(
+            widget.isSearching ? Icons.search : Icons.search,
+            color: widget.isSearching ? Colors.blue : Colors.grey[500],
+            size: 20,
+          ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              'Search blog posts',
-              style: TextStyle(color: Colors.grey[500], fontSize: 16),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search blog posts',
+                hintStyle: TextStyle(color: Colors.grey[500], fontSize: 16),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+              ),
+              onChanged: _handleSearch,
+              onSubmitted: _handleSearch,
             ),
           ),
+          if (_searchController.text.isNotEmpty)
+            GestureDetector(
+              onTap: () {
+                _searchController.clear();
+                _handleSearch('');
+              },
+              child: Icon(Icons.clear, color: Colors.grey[500], size: 20),
+            ),
         ],
       ),
     );
@@ -110,21 +253,61 @@ class _SearchBar extends StatelessWidget {
 }
 
 class _BlogListContent extends StatelessWidget {
+  final List<BlogPost> blogPosts;
+  final bool isLoading;
+  final String errorMessage;
+  final Future<void> Function() onRefresh;
+
+  const _BlogListContent({
+    required this.blogPosts,
+    required this.isLoading,
+    required this.errorMessage,
+    required this.onRefresh,
+  });
+
   @override
   Widget build(BuildContext context) {
-    final demoPosts = _DemoBlogPosts();
+    if (isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (errorMessage.isNotEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
+            const SizedBox(height: 16),
+            Text(
+              'Erreur',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.red[700],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              errorMessage,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: onRefresh,
+              child: const Text('Réessayer'),
+            ),
+          ],
+        ),
+      );
+    }
 
     return RefreshIndicator(
-      onRefresh: _handleRefresh,
-      child: demoPosts.isEmpty
+      onRefresh: onRefresh,
+      child: blogPosts.isEmpty
           ? _EmptyState()
-          : _BlogPostsList(blogPosts: demoPosts()),
+          : _BlogPostsList(blogPosts: blogPosts),
     );
-  }
-
-  Future<void> _handleRefresh() async {
-    // Simulation d'un rafraîchissement
-    await Future.delayed(const Duration(seconds: 1));
   }
 }
 
@@ -156,59 +339,29 @@ class _BlogPostsList extends StatelessWidget {
 }
 
 class _AddPostButton extends StatelessWidget {
+  final VoidCallback onPostAdded;
+
+  const _AddPostButton({required this.onPostAdded});
+
   @override
   Widget build(BuildContext context) {
     return FloatingActionButton(
-      onPressed: () {
-        Navigator.pushNamed(
+      onPressed: () async {
+        final result = await Navigator.pushNamed(
           context,
           AppRoutes.blogForm,
           arguments:
               BlogPostFormPageArguments(), // Pas de blogPost = mode création
         );
+
+        // Si un post a été créé, rafraîchir la liste
+        if (result == true) {
+          onPostAdded();
+        }
       },
       tooltip: 'Ajouter un blog post',
       backgroundColor: Colors.blue[600],
       child: const Icon(Icons.add, color: Colors.white),
     );
   }
-}
-
-// Widget helper pour les données de démonstration
-class _DemoBlogPosts {
-  static List<BlogPost> get _demoBlogPosts => [
-    BlogPost(
-      id: 1,
-      title: 'Introduction to Flutter Clean Architecture',
-      content:
-          'Flutter Clean Architecture is a powerful way to structure your Flutter applications...',
-      author: 'John Doe',
-      tags: ['Flutter', 'Architecture', 'Development'],
-      createdAt: DateTime.now().subtract(const Duration(hours: 2)),
-      updatedAt: DateTime.now().subtract(const Duration(hours: 2)),
-    ),
-    BlogPost(
-      id: 2,
-      title: 'Understanding State Management in Flutter',
-      content:
-          'State management is one of the most important concepts in Flutter development...',
-      author: 'Jane Smith',
-      tags: ['Flutter', 'State Management', 'BLoC'],
-      createdAt: DateTime.now().subtract(const Duration(days: 1)),
-      updatedAt: DateTime.now().subtract(const Duration(days: 1)),
-    ),
-    BlogPost(
-      id: 3,
-      title: 'Building Responsive UIs with Flutter',
-      content:
-          'Creating responsive user interfaces is crucial for modern mobile applications...',
-      author: 'John Doe',
-      tags: ['Flutter', 'UI', 'Responsive Design'],
-      createdAt: DateTime.now().subtract(const Duration(days: 3)),
-      updatedAt: DateTime.now().subtract(const Duration(days: 3)),
-    ),
-  ];
-
-  List<BlogPost> call() => _demoBlogPosts;
-  bool get isEmpty => _demoBlogPosts.isEmpty;
 }

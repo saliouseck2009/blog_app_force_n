@@ -1,51 +1,191 @@
 import 'package:flutter/material.dart';
 import '../../domain/entities/blog_post.dart';
+import '../../domain/usecases/delete_blog_post_usecase.dart';
+import '../../domain/usecases/get_blog_post_by_id.dart';
 import '../../../../core/routes/app_routes.dart';
+import '../../../../core/resources/data_state.dart';
+import '../../../../injection_container.dart';
 
-class BlogDetailPage extends StatelessWidget {
+class BlogDetailPage extends StatefulWidget {
   final BlogPost blogPost;
 
   const BlogDetailPage({super.key, required this.blogPost});
 
   @override
+  State<BlogDetailPage> createState() => _BlogDetailPageState();
+}
+
+class _BlogDetailPageState extends State<BlogDetailPage> {
+  late BlogPost _currentBlogPost;
+  bool _isLoading = false;
+
+  final DeleteBlogPostUseCase _deleteBlogPostUseCase =
+      sl<DeleteBlogPostUseCase>();
+  final GetBlogPostById _getBlogPostByIdUseCase = sl<GetBlogPostById>();
+
+  @override
+  void initState() {
+    super.initState();
+    _currentBlogPost = widget.blogPost;
+  }
+
+  Future<void> _refreshBlogPost() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    final dataState = await _getBlogPostByIdUseCase(_currentBlogPost.id);
+
+    if (dataState is DataSuccess<BlogPost>) {
+      setState(() {
+        _currentBlogPost = dataState.data!;
+        _isLoading = false;
+      });
+    } else {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _deleteBlogPost() async {
+    final shouldDelete = await _showDeleteConfirmation();
+    if (!shouldDelete) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    final dataState = await _deleteBlogPostUseCase(
+      DeleteBlogPostParams(id: _currentBlogPost.id),
+    );
+
+    setState(() {
+      _isLoading = false;
+    });
+
+    if (mounted) {
+      if (dataState is DataSuccess) {
+        _showSuccessMessage('Post deleted successfully!');
+        Navigator.pop(
+          context,
+          true,
+        ); // Retourner true pour indiquer une suppression
+      } else if (dataState is DataFailed) {
+        _showErrorMessage(dataState.error ?? 'Failed to delete post');
+      }
+    }
+  }
+
+  Future<bool> _showDeleteConfirmation() async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Delete Post'),
+            content: const Text(
+              'Are you sure you want to delete this post? This action cannot be undone.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
+  void _showSuccessMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.green),
+    );
+  }
+
+  void _showErrorMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: CustomScrollView(
-        slivers: [
-          _BlogDetailAppBar(blogPost: blogPost),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _BlogTitle(title: blogPost.title),
-                  const SizedBox(height: 24),
-                  _AuthorInfoSection(blogPost: blogPost),
-                  const SizedBox(height: 32),
-                  _ContentDivider(),
-                  const SizedBox(height: 32),
-                  _BlogContent(content: blogPost.content),
-                  const SizedBox(height: 40),
-                  if (blogPost.tags.isNotEmpty) ...[
-                    _TagsSection(tags: blogPost.tags),
-                    const SizedBox(height: 40),
-                  ],
-                ],
+      body: Stack(
+        children: [
+          CustomScrollView(
+            slivers: [
+              _BlogDetailAppBar(
+                blogPost: _currentBlogPost,
+                onEdit: _handleEdit,
+                onDelete: _deleteBlogPost,
+                onRefresh: _refreshBlogPost,
               ),
-            ),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _BlogTitle(title: _currentBlogPost.title),
+                      const SizedBox(height: 24),
+                      _AuthorInfoSection(blogPost: _currentBlogPost),
+                      const SizedBox(height: 32),
+                      _ContentDivider(),
+                      const SizedBox(height: 32),
+                      _BlogContent(content: _currentBlogPost.content),
+                      const SizedBox(height: 40),
+                      if (_currentBlogPost.tags.isNotEmpty) ...[
+                        _TagsSection(tags: _currentBlogPost.tags),
+                        const SizedBox(height: 40),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
+          if (_isLoading)
+            Container(
+              color: Colors.black26,
+              child: const Center(child: CircularProgressIndicator()),
+            ),
         ],
       ),
     );
+  }
+
+  Future<void> _handleEdit() async {
+    final result = await Navigator.pushNamed(
+      context,
+      AppRoutes.blogForm,
+      arguments: BlogPostFormPageArguments(blogPost: _currentBlogPost),
+    );
+
+    if (result == true) {
+      _refreshBlogPost();
+    }
   }
 }
 
 class _BlogDetailAppBar extends StatelessWidget {
   final BlogPost blogPost;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  final VoidCallback onRefresh;
 
-  const _BlogDetailAppBar({required this.blogPost});
+  const _BlogDetailAppBar({
+    required this.blogPost,
+    required this.onEdit,
+    required this.onDelete,
+    required this.onRefresh,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -60,15 +200,12 @@ class _BlogDetailAppBar extends StatelessWidget {
         onPressed: () => Navigator.pop(context),
       ),
       actions: [
+        _CircularIconButton(icon: Icons.refresh, onPressed: onRefresh),
+        _CircularIconButton(icon: Icons.edit, onPressed: onEdit),
         _CircularIconButton(
-          icon: Icons.edit,
-          onPressed: () {
-            Navigator.pushNamed(
-              context,
-              AppRoutes.blogForm,
-              arguments: BlogPostFormPageArguments(blogPost: blogPost),
-            );
-          },
+          icon: Icons.delete,
+          onPressed: onDelete,
+          backgroundColor: Colors.red.withValues(alpha: 0.9),
         ),
       ],
       flexibleSpace: FlexibleSpaceBar(
@@ -81,15 +218,20 @@ class _BlogDetailAppBar extends StatelessWidget {
 class _CircularIconButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onPressed;
+  final Color? backgroundColor;
 
-  const _CircularIconButton({required this.icon, required this.onPressed});
+  const _CircularIconButton({
+    required this.icon,
+    required this.onPressed,
+    this.backgroundColor,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: backgroundColor ?? Colors.white,
         shape: BoxShape.circle,
         boxShadow: [
           BoxShadow(
@@ -100,7 +242,10 @@ class _CircularIconButton extends StatelessWidget {
         ],
       ),
       child: IconButton(
-        icon: Icon(icon, color: Colors.black),
+        icon: Icon(
+          icon,
+          color: backgroundColor != null ? Colors.white : Colors.black,
+        ),
         onPressed: onPressed,
       ),
     );

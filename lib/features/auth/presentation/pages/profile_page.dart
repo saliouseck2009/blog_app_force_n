@@ -1,26 +1,193 @@
 import 'package:flutter/material.dart';
 import '../../domain/entities/user.dart';
+import '../../domain/usecases/get_current_user_usecase.dart';
+import '../../domain/usecases/logout_usecase.dart';
 import '../../../../core/routes/app_routes.dart';
+import '../../../../core/resources/data_state.dart';
+import '../../../../core/usecases/usecase.dart';
+import '../../../../injection_container.dart';
 
 /// Page de profil utilisateur
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    // Utilisateur de démonstration pour la présentation
-    final demoUser = User(
-      id: 'demo-user-1',
-      firstName: 'John',
-      lastName: 'Doe',
-      email: 'john.doe@example.com',
-      createdAt: DateTime.now().subtract(const Duration(days: 30)),
-      updatedAt: DateTime.now(),
-    );
+  State<ProfilePage> createState() => _ProfilePageState();
+}
 
+class _ProfilePageState extends State<ProfilePage> {
+  User? _currentUser;
+  bool _isLoading = true;
+  String _errorMessage = '';
+
+  final GetCurrentUserUseCase _getCurrentUserUseCase =
+      sl<GetCurrentUserUseCase>();
+  final LogoutUseCase _logoutUseCase = sl<LogoutUseCase>();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserProfile();
+  }
+
+  Future<void> _loadUserProfile() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
+
+    try {
+      final dataState = await _getCurrentUserUseCase(NoParams());
+
+      if (dataState is DataSuccess) {
+        if (dataState.data != null) {
+          setState(() {
+            _currentUser = dataState.data;
+            _isLoading = false;
+          });
+        } else {
+          // No user logged in, redirect to login
+          if (mounted) {
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              AppRoutes.login,
+              (route) => false,
+            );
+          }
+        }
+      } else if (dataState is DataFailed) {
+        // Check if error indicates no authentication
+        final errorMessage = dataState.error ?? 'Failed to load profile';
+        if (errorMessage.toLowerCase().contains('no authenticated user') ||
+            errorMessage.toLowerCase().contains('please log in')) {
+          // Redirect to login
+          if (mounted) {
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              AppRoutes.login,
+              (route) => false,
+            );
+          }
+        } else {
+          setState(() {
+            _errorMessage = errorMessage;
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      final errorString = e.toString();
+      // Check if error indicates authentication issue
+      if (errorString.toLowerCase().contains('no authenticated user') ||
+          errorString.toLowerCase().contains('please log in')) {
+        // Redirect to login
+        if (mounted) {
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            AppRoutes.login,
+            (route) => false,
+          );
+        }
+      } else {
+        setState(() {
+          _errorMessage = 'Error: $errorString';
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _handleLogout() async {
+    try {
+      final dataState = await _logoutUseCase(NoParams());
+
+      if (mounted) {
+        if (dataState is DataSuccess) {
+          // Navigation vers la page de connexion
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            AppRoutes.login,
+            (route) => false,
+          );
+        } else if (dataState is DataFailed) {
+          _showErrorMessage(dataState.error ?? 'Logout failed');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorMessage('Error: ${e.toString()}');
+      }
+    }
+  }
+
+  void _showErrorMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      body: ProfileContent(user: demoUser),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage.isNotEmpty
+          ? _buildErrorState()
+          : _currentUser != null
+          ? ProfileContent(
+              user: _currentUser!,
+              onLogout: _handleLogout,
+              onRefresh: _loadUserProfile,
+            )
+          : _buildNoUserState(),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
+          const SizedBox(height: 16),
+          Text(
+            'Error',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.red[700],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _errorMessage,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton(
+            onPressed: _loadUserProfile,
+            child: const Text('Retry'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNoUserState() {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.person_off, size: 64, color: Colors.grey),
+          SizedBox(height: 16),
+          Text(
+            'No user data found',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -28,15 +195,22 @@ class ProfilePage extends StatelessWidget {
 /// Widget pour le contenu principal du profil
 class ProfileContent extends StatelessWidget {
   final User user;
+  final VoidCallback onLogout;
+  final VoidCallback onRefresh;
 
-  const ProfileContent({super.key, required this.user});
+  const ProfileContent({
+    super.key,
+    required this.user,
+    required this.onLogout,
+    required this.onRefresh,
+  });
 
   @override
   Widget build(BuildContext context) {
     return SafeArea(
       child: Column(
         children: [
-          const ProfileHeader(),
+          ProfileHeader(onRefresh: onRefresh),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
@@ -46,7 +220,7 @@ class ProfileContent extends StatelessWidget {
                   const SizedBox(height: 32),
                   ProfileAccountSection(user: user),
                   const SizedBox(height: 32),
-                  const ProfileLogoutButton(),
+                  ProfileLogoutButton(onLogout: onLogout),
                 ],
               ),
             ),
@@ -59,7 +233,9 @@ class ProfileContent extends StatelessWidget {
 
 /// Widget pour l'en-tête du profil
 class ProfileHeader extends StatelessWidget {
-  const ProfileHeader({super.key});
+  final VoidCallback onRefresh;
+
+  const ProfileHeader({super.key, required this.onRefresh});
 
   @override
   Widget build(BuildContext context) {
@@ -90,7 +266,16 @@ class ProfileHeader extends StatelessWidget {
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
               ),
               const Spacer(),
-              const SizedBox(width: 48), // Pour équilibrer le back button
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.refresh, color: Colors.black),
+                  onPressed: onRefresh,
+                ),
+              ),
             ],
           ),
         ],
@@ -269,7 +454,9 @@ class ProfileAccountDetailItem extends StatelessWidget {
 
 /// Widget pour le bouton de déconnexion
 class ProfileLogoutButton extends StatelessWidget {
-  const ProfileLogoutButton({super.key});
+  final VoidCallback onLogout;
+
+  const ProfileLogoutButton({super.key, required this.onLogout});
 
   @override
   Widget build(BuildContext context) {
@@ -324,14 +511,16 @@ class ProfileLogoutButton extends StatelessWidget {
   void _showLogoutDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => const ProfileLogoutDialog(),
+      builder: (context) => ProfileLogoutDialog(onLogout: onLogout),
     );
   }
 }
 
 /// Widget pour la boîte de dialogue de déconnexion
 class ProfileLogoutDialog extends StatelessWidget {
-  const ProfileLogoutDialog({super.key});
+  final VoidCallback onLogout;
+
+  const ProfileLogoutDialog({super.key, required this.onLogout});
 
   @override
   Widget build(BuildContext context) {
@@ -346,12 +535,7 @@ class ProfileLogoutDialog extends StatelessWidget {
         TextButton(
           onPressed: () {
             Navigator.pop(context);
-            // Navigation vers la page de connexion
-            Navigator.pushNamedAndRemoveUntil(
-              context,
-              AppRoutes.login,
-              (route) => false,
-            );
+            onLogout();
           },
           style: TextButton.styleFrom(foregroundColor: Colors.red),
           child: const Text('Logout'),

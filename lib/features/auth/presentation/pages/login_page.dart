@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../../blog/presentation/widgets/custom_text_field.dart';
 import '../../../blog/presentation/widgets/action_button.dart';
+import '../../domain/usecases/login_usecase.dart';
+import '../../domain/entities/auth_credentials.dart';
 import '../../../../core/routes/app_routes.dart';
+import '../../../../core/resources/data_state.dart';
+import '../../../../injection_container.dart';
 
 /// Page de connexion
 class LoginPage extends StatefulWidget {
@@ -13,9 +17,12 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController(text: "saliou@exemple.com");
+  final _emailController = TextEditingController(text: "john.doe@example.com");
   final _passwordController = TextEditingController();
   bool _isLoading = false;
+  String _errorMessage = '';
+
+  final LoginUseCase _loginUseCase = sl<LoginUseCase>();
 
   @override
   void dispose() {
@@ -28,20 +35,54 @@ class _LoginPageState extends State<LoginPage> {
     if (_formKey.currentState?.validate() ?? false) {
       setState(() {
         _isLoading = true;
+        _errorMessage = '';
       });
 
-      // Simulation d'une connexion
-      await Future.delayed(const Duration(seconds: 1));
+      try {
+        final dataState = await _loginUseCase(
+          AuthCredentials(
+            email: _emailController.text.trim(),
+            password: _passwordController.text.trim(),
+          ),
+        );
 
-      if (mounted) {
         setState(() {
           _isLoading = false;
         });
 
-        // Navigation vers la liste des blogs
-        Navigator.pushReplacementNamed(context, AppRoutes.blogList);
+        if (mounted) {
+          if (dataState is DataSuccess) {
+            _showSuccessMessage('Login successful!');
+            Navigator.pushReplacementNamed(context, AppRoutes.blogList);
+          } else if (dataState is DataFailed) {
+            setState(() {
+              _errorMessage = dataState.error ?? 'Login failed';
+            });
+            _showErrorMessage(_errorMessage);
+          }
+        }
+      } catch (e) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Error: ${e.toString()}';
+        });
+        if (mounted) {
+          _showErrorMessage(_errorMessage);
+        }
       }
     }
+  }
+
+  void _showSuccessMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.green),
+    );
+  }
+
+  void _showErrorMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
+    );
   }
 
   @override

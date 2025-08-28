@@ -101,8 +101,18 @@ class AuthRepositoryImpl implements AuthRepository {
         return DataSuccess(userModel);
       }
 
-      // Aucun utilisateur trouvé
-      return DataSuccess(null);
+      // Si aucun utilisateur local n'est trouvé, essayer de le récupérer depuis la source de données distante
+      try {
+        final userModel = await _remoteDataSource.getCurrentUser();
+
+        // Sauvegarder l'utilisateur récupéré dans le stockage local
+        await _secureStorage.saveCurrentUser(jsonEncode(userModel.toJson()));
+
+        return DataSuccess(userModel);
+      } catch (e) {
+        // Si l'API échoue aussi, retourner null (utilisateur non connecté)
+        return DataSuccess(null);
+      }
     } catch (e) {
       return DataFailed(
         'Impossible de récupérer les données utilisateur: ${e.toString()}',

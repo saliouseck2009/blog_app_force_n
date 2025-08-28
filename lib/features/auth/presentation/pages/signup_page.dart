@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../../blog/presentation/widgets/custom_text_field.dart';
 import '../../../blog/presentation/widgets/action_button.dart';
+import '../../domain/usecases/signup_usecase.dart';
+import '../../domain/entities/auth_credentials.dart';
 import '../../../../core/routes/app_routes.dart';
+import '../../../../core/resources/data_state.dart';
+import '../../../../injection_container.dart';
 
 /// Page d'inscription
 class SignUpPage extends StatefulWidget {
@@ -15,9 +19,12 @@ class _SignUpPageState extends State<SignUpPage> {
   final _formKey = GlobalKey<FormState>();
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
-  final _emailController = TextEditingController(text: "saliou@exemple.com");
+  final _emailController = TextEditingController(text: "john.doe@example.com");
   final _passwordController = TextEditingController();
   bool _isLoading = false;
+  String _errorMessage = '';
+
+  final SignUpUseCase _signUpUseCase = sl<SignUpUseCase>();
 
   @override
   void dispose() {
@@ -32,20 +39,56 @@ class _SignUpPageState extends State<SignUpPage> {
     if (_formKey.currentState?.validate() ?? false) {
       setState(() {
         _isLoading = true;
+        _errorMessage = '';
       });
 
-      // Simulation d'une inscription
-      await Future.delayed(const Duration(seconds: 1));
+      try {
+        final dataState = await _signUpUseCase(
+          SignUpData(
+            firstName: _firstNameController.text.trim(),
+            lastName: _lastNameController.text.trim(),
+            email: _emailController.text.trim(),
+            password: _passwordController.text.trim(),
+          ),
+        );
 
-      if (mounted) {
         setState(() {
           _isLoading = false;
         });
 
-        // Navigation vers la liste des blogs
-        Navigator.pushReplacementNamed(context, AppRoutes.blogList);
+        if (mounted) {
+          if (dataState is DataSuccess) {
+            _showSuccessMessage('Account created successfully!');
+            Navigator.pushReplacementNamed(context, AppRoutes.blogList);
+          } else if (dataState is DataFailed) {
+            setState(() {
+              _errorMessage = dataState.error ?? 'Sign up failed';
+            });
+            _showErrorMessage(_errorMessage);
+          }
+        }
+      } catch (e) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Error: ${e.toString()}';
+        });
+        if (mounted) {
+          _showErrorMessage(_errorMessage);
+        }
       }
     }
+  }
+
+  void _showSuccessMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.green),
+    );
+  }
+
+  void _showErrorMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
+    );
   }
 
   @override

@@ -2,7 +2,9 @@ import '../../../../core/services/auth_service.dart';
 import '../../../../core/config/storage/secure_storage.dart';
 import '../models/user_model.dart';
 import 'auth_remote_data_source.dart';
+import 'dart:convert';
 
+/// Real implementation of AuthRemoteDataSource that makes actual API calls
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   final AuthService _authService;
   final SecureStorage _secureStorage;
@@ -22,12 +24,17 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
     // Sauvegarder les données d'authentification
     if (response['token'] != null && response['user'] != null) {
+      final userData = response['user'] as Map<String, dynamic>;
+
       await _secureStorage.saveAuthData(
-        token: response['token'],
-        refreshToken: response['refreshToken'] ?? '',
-        userId: response['user']['id']?.toString() ?? '',
-        userEmail: response['user']['email'] ?? '',
+        token: response['token'] as String,
+        refreshToken: (response['refreshToken'] ?? '') as String,
+        userId: userData['id']?.toString() ?? '',
+        userEmail: userData['email']?.toString() ?? '',
       );
+
+      // Save complete user data
+      await _secureStorage.saveCurrentUser(jsonEncode(userData));
     }
 
     return response;
@@ -49,12 +56,17 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
     // Sauvegarder les données d'authentification si l'inscription inclut la connexion
     if (response['token'] != null && response['user'] != null) {
+      final userData = response['user'] as Map<String, dynamic>;
+
       await _secureStorage.saveAuthData(
-        token: response['token'],
-        refreshToken: response['refreshToken'] ?? '',
-        userId: response['user']['id']?.toString() ?? '',
-        userEmail: response['user']['email'] ?? '',
+        token: response['token'] as String,
+        refreshToken: (response['refreshToken'] ?? '') as String,
+        userId: userData['id']?.toString() ?? '',
+        userEmail: userData['email']?.toString() ?? '',
       );
+
+      // Save complete user data
+      await _secureStorage.saveCurrentUser(jsonEncode(userData));
     }
 
     return response;
@@ -84,13 +96,13 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     if (response['token'] != null) {
       await _secureStorage.setItem(
         key: SecureStorageKey.token,
-        value: response['token'],
+        value: response['token'] as String,
       );
 
       if (response['refreshToken'] != null) {
         await _secureStorage.setItem(
           key: SecureStorageKey.refreshToken,
-          value: response['refreshToken'],
+          value: response['refreshToken'] as String,
         );
       }
     }

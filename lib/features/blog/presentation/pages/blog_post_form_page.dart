@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../domain/entities/blog_post.dart';
+import '../../domain/usecases/create_blog_post_usecase.dart';
+import '../../domain/usecases/update_blog_post_usecase.dart';
+import '../../../../core/resources/data_state.dart';
+import '../../../../injection_container.dart';
 import '../widgets/page_header.dart';
 import '../widgets/blog_post_form.dart';
 import '../widgets/form_bottom_section.dart';
@@ -22,6 +26,13 @@ class _BlogPostFormPageState extends State<BlogPostFormPage> {
   late final TextEditingController _tagsController;
 
   bool _isLoading = false;
+  String _errorMessage = '';
+
+  // Use cases
+  final CreateBlogPostUseCase _createBlogPostUseCase =
+      sl<CreateBlogPostUseCase>();
+  final UpdateBlogPostUseCase _updateBlogPostUseCase =
+      sl<UpdateBlogPostUseCase>();
 
   /// Retourne true si on est en mode édition
   bool get _isEditMode => widget.blogPost != null;
@@ -92,46 +103,61 @@ class _BlogPostFormPageState extends State<BlogPostFormPage> {
     if (_formKey.currentState?.validate() ?? false) {
       setState(() {
         _isLoading = true;
+        _errorMessage = '';
       });
 
-      // Simuler un délai de traitement
-      await Future.delayed(const Duration(milliseconds: 800));
+      try {
+        final tags = _tagsController.text
+            .split(',')
+            .map((tag) => tag.trim())
+            .where((tag) => tag.isNotEmpty)
+            .toList();
 
-      // TODO: Implémenter la logique de sauvegarde/édition
-      // final tags = _tagsController.text
-      //     .split(',')
-      //     .map((tag) => tag.trim())
-      //     .where((tag) => tag.isNotEmpty)
-      //     .toList();
+        final blogPost = BlogPost(
+          id: _isEditMode
+              ? widget.blogPost!.id
+              : 0, // L'ID sera généré côté serveur pour la création
+          title: _titleController.text.trim(),
+          content: _contentController.text.trim(),
+          author: _authorController.text.trim(),
+          tags: tags,
+          createdAt: _isEditMode ? widget.blogPost!.createdAt : DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
 
-      // if (_isEditMode) {
-      //   context.read<BlogBloc>().add(
-      //     EditBlogPostEvent(
-      //       id: widget.blogPost.id,
-      //       title: _titleController.text.trim(),
-      //       content: _contentController.text.trim(),
-      //       author: _authorController.text.trim(),
-      //       tags: tags,
-      //     ),
-      //   );
-      // } else {
-      //   context.read<BlogBloc>().add(
-      //     AddBlogPostEvent(
-      //       title: _titleController.text.trim(),
-      //       content: _contentController.text.trim(),
-      //       author: _authorController.text.trim(),
-      //       tags: tags,
-      //     ),
-      //   );
-      // }
+        DataState result;
+        if (_isEditMode) {
+          result = await _updateBlogPostUseCase(blogPost);
+        } else {
+          result = await _createBlogPostUseCase(blogPost);
+        }
 
-      setState(() {
-        _isLoading = false;
-      });
+        setState(() {
+          _isLoading = false;
+        });
 
-      if (mounted) {
-        _showSuccessMessage();
-        Navigator.pop(context);
+        if (mounted) {
+          if (result is DataSuccess) {
+            _showSuccessMessage();
+            Navigator.pop(
+              context,
+              true,
+            ); // Retourner true pour indiquer le succès
+          } else if (result is DataFailed) {
+            setState(() {
+              _errorMessage = result.error ?? 'Une erreur est survenue';
+            });
+            _showErrorMessage(_errorMessage);
+          }
+        }
+      } catch (e) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Erreur: ${e.toString()}';
+        });
+        if (mounted) {
+          _showErrorMessage(_errorMessage);
+        }
       }
     }
   }
@@ -143,6 +169,16 @@ class _BlogPostFormPageState extends State<BlogPostFormPage> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), backgroundColor: Colors.green),
+    );
+  }
+
+  void _showErrorMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 4),
+      ),
     );
   }
 }

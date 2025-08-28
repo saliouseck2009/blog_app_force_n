@@ -10,6 +10,7 @@ import 'core/services/blog_service.dart';
 
 // Blog imports
 import 'features/blog/data/datasources/blog_remote_data_source.dart';
+import 'features/blog/data/datasources/blog_remote_data_source_fake.dart';
 import 'features/blog/data/repositories/blog_repository_impl.dart';
 import 'features/blog/domain/repositories/blog_repository.dart';
 import 'features/blog/domain/usecases/get_all_blog_posts.dart';
@@ -23,6 +24,7 @@ import 'features/blog/domain/usecases/search_blog_posts_usecase.dart';
 import 'features/auth/data/repositories/auth_repository_impl.dart';
 import 'features/auth/data/datasources/auth_remote_data_source.dart';
 import 'features/auth/data/datasources/auth_remote_data_source_impl.dart';
+import 'features/auth/data/datasources/auth_remote_data_source_fake.dart';
 import 'features/auth/domain/repositories/auth_repository.dart';
 import 'features/auth/domain/usecases/login_usecase.dart';
 import 'features/auth/domain/usecases/signup_usecase.dart';
@@ -31,6 +33,10 @@ import 'features/auth/domain/usecases/logout_usecase.dart';
 
 /// Service Locator global
 final sl = GetIt.instance;
+
+/// Configuration flag for using fake data sources (for development/testing)
+/// Set to true to use fake implementations, false for real API calls
+const bool useFakeImplementations = true;
 
 /// Configuration de l'injection de dépendances
 Future<void> init() async {
@@ -58,9 +64,13 @@ Future<void> init() async {
   );
 
   // Data sources
-  sl.registerLazySingleton<AuthRemoteDataSource>(
-    () => AuthRemoteDataSourceImpl(authService: sl(), secureStorage: sl()),
-  );
+  sl.registerLazySingleton<AuthRemoteDataSource>(() {
+    if (useFakeImplementations) {
+      return AuthRemoteDataSourceFake(secureStorage: sl());
+    } else {
+      return AuthRemoteDataSourceImpl(authService: sl(), secureStorage: sl());
+    }
+  });
 
   // Use cases
   sl.registerLazySingleton(() => GetAllBlogPosts(sl()));
@@ -76,7 +86,11 @@ Future<void> init() async {
   );
 
   // Data sources
-  sl.registerLazySingleton<BlogRemoteDataSource>(
-    () => BlogRemoteDataSourceImpl(blogService: sl()),
-  );
+  sl.registerLazySingleton<BlogRemoteDataSource>(() {
+    if (useFakeImplementations) {
+      return BlogRemoteDataSourceFake();
+    } else {
+      return BlogRemoteDataSourceImpl(blogService: sl());
+    }
+  });
 }
