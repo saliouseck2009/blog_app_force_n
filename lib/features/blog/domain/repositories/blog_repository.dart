@@ -17,7 +17,4 @@ abstract class BlogRepository {
 
   /// Supprime un blog post
   Future<DataState<void>> deleteBlogPost(int id);
-
-  /// Recherche des blog posts par mot-clé
-  Future<DataState<List<BlogPost>>> searchBlogPosts(String query);
 }

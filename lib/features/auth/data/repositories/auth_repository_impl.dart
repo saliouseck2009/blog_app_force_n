@@ -76,24 +76,8 @@ class AuthRepositoryImpl implements AuthRepository {
     }
   }
 
-  @override
-  Future<DataState<void>> logout() async {
-    try {
-      await _remoteDataSource.logout();
-
-      // Nettoyer toutes les données d'authentification du stockage sécurisé
-      await _secureStorage.clearAuthData();
-
-      return DataSuccess(null);
-    } catch (e) {
-      return DataFailed('Erreur lors de la déconnexion: ${e.toString()}');
-    }
-  }
-
-  @override
   Future<DataState<User?>> getCurrentUser() async {
     try {
-      // D'abord essayer de récupérer l'utilisateur depuis le stockage local
       final userJson = await _secureStorage.getCurrentUser();
 
       if (userJson != null && userJson.isNotEmpty) {

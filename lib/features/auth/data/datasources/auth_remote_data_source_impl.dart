@@ -1,6 +1,5 @@
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/config/storage/secure_storage.dart';
-import '../models/user_model.dart';
 import 'auth_remote_data_source.dart';
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
@@ -60,59 +59,5 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     return response;
   }
 
-  @override
-  Future<void> logout() async {
-    try {
-      await _authService.logout();
-    } finally {
-      // Toujours supprimer les données locales même en cas d'erreur serveur
-      await _secureStorage.clearAuthData();
-    }
-  }
 
-  @override
-  Future<UserModel> getCurrentUser() async {
-    final response = await _authService.getCurrentUser();
-    return UserModel.fromJson(response['user'] ?? response);
-  }
-
-  @override
-  Future<Map<String, dynamic>> refreshToken(String refreshToken) async {
-    final response = await _authService.refreshToken(refreshToken);
-
-    // Mettre à jour le token
-    if (response['token'] != null) {
-      await _secureStorage.setItem(
-        key: SecureStorageKey.token,
-        value: response['token'],
-      );
-
-      if (response['refreshToken'] != null) {
-        await _secureStorage.setItem(
-          key: SecureStorageKey.refreshToken,
-          value: response['refreshToken'],
-        );
-      }
-    }
-
-    return response;
-  }
-
-  @override
-  Future<UserModel> updateProfile({
-    required String firstName,
-    required String lastName,
-    required String email,
-  }) async {
-    final response = await _authService.updateProfile(
-      firstName: firstName,
-      lastName: lastName,
-      email: email,
-    );
-
-    // Mettre à jour l'email stocké localement
-    await _secureStorage.setItem(key: SecureStorageKey.userEmail, value: email);
-
-    return UserModel.fromJson(response['user'] ?? response);
-  }
 }

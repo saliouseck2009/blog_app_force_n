@@ -79,36 +79,5 @@ class BlogService {
     );
   }
 
-  /// Recherche de blog posts par titre ou contenu
-  Future<List<dynamic>> searchBlogPosts(String query) async {
-    final response = await _networkingService.get(
-      ApiEndpoints.blogs,
-      requiresToken: false,
-      queryParameters: {'search': query},
-    );
-
-    return response.data as List<dynamic>;
-  }
-
-  /// Récupération des blog posts par auteur
-  Future<List<dynamic>> getBlogPostsByAuthor(String author) async {
-    final response = await _networkingService.get(
-      ApiEndpoints.blogs,
-      requiresToken: false,
-      queryParameters: {'author': author},
-    );
-
-    return response.data as List<dynamic>;
-  }
-
-  /// Récupération des blog posts par tag
-  Future<List<dynamic>> getBlogPostsByTag(String tag) async {
-    final response = await _networkingService.get(
-      ApiEndpoints.blogs,
-      requiresToken: false,
-      queryParameters: {'tag': tag},
-    );
-
-    return response.data as List<dynamic>;
-  }
+ 
 }

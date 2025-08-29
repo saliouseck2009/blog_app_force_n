@@ -18,8 +18,7 @@ abstract class BlogRemoteDataSource {
   /// Supprime un blog post via l'API
   Future<void> deleteBlogPost(int id);
 
-  /// Recherche des blog posts par mot-clé via l'API
-  Future<List<BlogPostModel>> searchBlogPosts(String query);
+
 }
 
 /// Implémentation concrète du data source distant pour les blogs
@@ -71,9 +70,5 @@ class BlogRemoteDataSourceImpl implements BlogRemoteDataSource {
     await _blogService.deleteBlogPost(id);
   }
 
-  @override
-  Future<List<BlogPostModel>> searchBlogPosts(String query) async {
-    final response = await _blogService.searchBlogPosts(query);
-    return response.map((json) => BlogPostModel.fromJson(json)).toList();
-  }
+
 }
