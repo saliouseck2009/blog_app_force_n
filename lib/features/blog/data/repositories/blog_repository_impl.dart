@@ -64,16 +64,6 @@ class BlogRepositoryImpl implements BlogRepository {
     }
   }
 
-  @override
-  Future<DataState<List<BlogPost>>> searchBlogPosts(String query) async {
-    try {
-      final remoteBlogPosts = await remoteDataSource.searchBlogPosts(query);
-      return DataSuccess(remoteBlogPosts);
-    } catch (e) {
-      return DataFailed('Erreur serveur: ${e.toString()}');
-    }
-  }
-
   /// Convertit une entité BlogPost en modèle BlogPostModel
   BlogPostModel _toModel(BlogPost blogPost) {
     return BlogPostModel(

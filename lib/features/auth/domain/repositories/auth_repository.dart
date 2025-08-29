@@ -9,10 +9,4 @@ abstract class AuthRepository {
 
   /// Inscrire un nouvel utilisateur
   Future<DataState<User>> signUp(SignUpData signUpData);
-
-  /// Déconnecter l'utilisateur actuel
-  Future<DataState<void>> logout();
-
-  /// Obtenir l'utilisateur actuellement connecté
-  Future<DataState<User?>> getCurrentUser();
 }
