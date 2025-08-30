@@ -1,9 +1,11 @@
+import 'package:blog_app/features/auth/auth_service.dart';
+import 'package:blog_app/features/auth/models/auth_credentials.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../blog/presentation/widgets/custom_text_field.dart';
 import '../../../blog/presentation/widgets/action_button.dart';
 import '../../../../core/routes/app_routes.dart';
 
-/// Page d'inscription
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
 
@@ -15,9 +17,10 @@ class _SignUpPageState extends State<SignUpPage> {
   final _formKey = GlobalKey<FormState>();
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
-  final _emailController = TextEditingController(text: "saliou@exemple.com");
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
+  final AuthService _authService = AuthService();
 
   @override
   void dispose() {
@@ -34,16 +37,36 @@ class _SignUpPageState extends State<SignUpPage> {
         _isLoading = true;
       });
 
-      // Simulation d'une inscription
-      await Future.delayed(const Duration(seconds: 1));
+      try {
+        // Simulation d'une inscription
+        SignUpData signUpData = SignUpData(
+          prenom: _firstNameController.text,
+          nom: _lastNameController.text,
+          email: _emailController.text,
+          motDePasse: _passwordController.text,
+        );
+        final response = await _authService.signUp(signUpData);
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        String? token = prefs.getString("token");
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Inscription réussie pour $token')),
+        );
 
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-
-        // Navigation vers la liste des blogs
-        Navigator.pushReplacementNamed(context, AppRoutes.blogList);
+        if (mounted) {
+          // Navigation vers la liste des blogs
+          Navigator.pushReplacementNamed(context, AppRoutes.blogList);
+        }
+      } catch (e) {
+        print(e);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur lors de l\'inscription : $e')),
+        );
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
       }
     }
   }
