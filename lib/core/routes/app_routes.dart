@@ -5,7 +5,7 @@ import '../../features/auth/presentation/pages/profile_page.dart';
 import '../../features/blog/presentation/pages/blog_list_page.dart';
 import '../../features/blog/presentation/pages/blog_detail_page.dart';
 import '../../features/blog/presentation/pages/blog_post_form_page.dart';
-import '../../features/blog/domain/entities/blog_post.dart';
+import '../../features/blog/models/blog_post.dart';
 
 /// Arguments pour la page de détail de blog
 class BlogDetailPageArguments {

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../widgets/blog_post_card.dart';
 import '../../../../core/routes/app_routes.dart';
-import '../../domain/entities/blog_post.dart';
+import '../../models/blog_post.dart';
 
 class BlogListPage extends StatelessWidget {
   const BlogListPage({super.key});

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../domain/entities/blog_post.dart';
+import '../../models/blog_post.dart';
 import '../widgets/page_header.dart';
 import '../widgets/blog_post_form.dart';
 import '../widgets/form_bottom_section.dart';
